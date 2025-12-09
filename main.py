@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File
+from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
@@ -26,8 +27,8 @@ app = FastAPI(
     ),
     version="1.0.0",
     contact={
-        "name": "Backend Test",
-        "email": "support@example.com",
+        "name": "Limitless Sould Studio",
+        "email": "aa.developer.mng@lslab.co",
     },
     license_info={
         "name": "MIT",
@@ -38,22 +39,53 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# ----- CORS Middleware -----
+app.mount("/images", StaticFiles(directory="images"), name="images")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # or ["*"] for all origins
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ----- In-Memory Storage (replace with DB in production) -----
 users_db = {}
 otp_db = {}
 refresh_tokens_db = {}
 projects_db = []
+sales_db = []
+sales_images = [
+    f"images/{img}"
+    for img in [
+        "1.jpg",
+        "2.jpg",
+        "3.jpg",
+        "4.jpg",
+        "5.jpg",
+        "6.jpg",
+        "7.jpg",
+        "8.jpg",
+        "9.jpg",
+        "10.jpg",
+        "11.jpg",
+        "12.jpg",
+        "13.jpg",
+        "14.jpg",
+        "15.jpg",
+        "16.jpg",
+        "17.jpg",
+        "18.jpg",
+        "19.jpg",
+        "20.jpg",
+        "21.jpg",
+        "22.jpg",
+    ]
+]
 
-# ----- JWT Settings -----
+SECRET_KEY = "change_this_secret_in_production"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60
+REFRESH_TOKEN_EXPIRE_DAYS = 7
 SECRET_KEY = "change_this_secret_in_production"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
@@ -62,7 +94,11 @@ REFRESH_TOKEN_EXPIRE_DAYS = 7
 auth_bearer = HTTPBearer(auto_error=True)
 
 
-# ----- Pydantic Models -----
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
 class RegisterRequest(BaseModel):
     email: EmailStr
     password: str
@@ -106,7 +142,10 @@ class ProjectOut(BaseModel):
     date: str
 
 
-# ----- Helper Functions -----
+def generate_fake_otp(length: int = 6):
+    return "".join(random.choices(string.ascii_uppercase + string.digits, k=length))
+
+
 def generate_fake_otp(length: int = 6):
     return "".join(random.choices(string.ascii_uppercase + string.digits, k=length))
 
@@ -204,7 +243,51 @@ def seed_projects_once() -> None:
         )
 
 
-# ----- Routes -----
+def seed_sales_once() -> None:
+    if sales_db:
+        return
+    names = [
+        "Alice Smith",
+        "Bob Johnson",
+        "Charlie Lee",
+        "Diana Prince",
+        "Evan Wright",
+        "Fiona Adams",
+        "George Clark",
+        "Hannah Scott",
+        "Ian Turner",
+        "Julia Evans",
+        "Kevin Brown",
+        "Laura Davis",
+        "Mike Wilson",
+        "Nina King",
+        "Oscar Young",
+        "Paula Hall",
+        "Quentin Fox",
+        "Rachel Green",
+        "Sam Lewis",
+        "Tina Baker",
+        "Uma Reed",
+        "Victor Cruz",
+    ]
+    emails = [f"user{i + 1}@example.com" for i in range(len(names))]
+    for i, (name, email) in enumerate(zip(names, emails)):
+        sales_db.append(
+            {
+                "name": name,
+                "email": email,
+                "sales": random.randint(1000, 10000),
+                "image": sales_images[i % len(sales_images)],
+            }
+        )
+
+
+@app.post("/auth/register", tags=["auth"])
+def register(request: RegisterRequest):
+    if request.email in users_db:
+        raise HTTPException(status_code=400, detail="User already exists")
+
+
 @app.post("/auth/register", tags=["auth"])
 def register(request: RegisterRequest):
     if request.email in users_db:
@@ -212,7 +295,7 @@ def register(request: RegisterRequest):
 
     otp = generate_fake_otp()
     otp_db[request.email] = {"otp": otp, "password": request.password}
-    return {"message": "OTP sent", "otp": otp}  # in production, send via email/SMS
+    return {"message": "OTP sent", "otp": otp}
 
 
 @app.post("/auth/verify-otp", tags=["auth"])
@@ -324,7 +407,11 @@ def refresh_token_endpoint(token: str):
     }
 
 
-# ----- Profile Endpoints -----
+@app.get("/me", response_model=UserResponse, tags=["profile"])
+def get_me(current_user: dict = Depends(get_current_user)):
+    return current_user
+
+
 @app.get("/me", response_model=UserResponse, tags=["profile"])
 def get_me(current_user: dict = Depends(get_current_user)):
     return current_user
@@ -346,7 +433,6 @@ def update_me(user: Profile, current_user: dict = Depends(get_current_user)):
 
 @app.get("/report", tags=["report"])
 def get_sales_report(current_user: dict = Depends(get_current_user)):
-    # Create 12 sample sales entries with ISO datetime
     now = datetime.utcnow()
     samples = []
     for i in range(12):
@@ -358,11 +444,9 @@ def get_sales_report(current_user: dict = Depends(get_current_user)):
                 "date": entry_date,
             }
         )
-    # Return in chronological order (oldest first)
     return list(reversed(samples))
 
 
-# ----- Projects Endpoint (Paginated) -----
 @app.get("/projects", response_model=dict, tags=["projects"])
 def list_projects(page: int = 1):
     seed_projects_once()
@@ -370,7 +454,6 @@ def list_projects(page: int = 1):
     total = len(projects_db)
     total_pages = 3
     if total != 12:
-        # Ensure fixed-size catalogue per requirements
         raise HTTPException(status_code=500, detail="Projects catalogue misconfigured")
     if page < 1 or page > total_pages:
         raise HTTPException(status_code=400, detail="Page must be between 1 and 3")
@@ -384,3 +467,55 @@ def list_projects(page: int = 1):
         "total_pages": total_pages,
         "total": total,
     }
+
+
+@app.get("/projects", response_model=dict, tags=["projects"])
+def list_projects(page: int = 1):
+    seed_projects_once()
+    per_page = 4
+    total = len(projects_db)
+    total_pages = 3
+    if total != 12:
+        raise HTTPException(status_code=500, detail="Projects catalogue misconfigured")
+    if page < 1 or page > total_pages:
+        raise HTTPException(status_code=400, detail="Page must be between 1 and 3")
+    start = (page - 1) * per_page
+    end = start + per_page
+    items = projects_db[start:end]
+    return {
+        "items": items,
+        "page": page,
+        "per_page": per_page,
+        "total_pages": total_pages,
+        "total": total,
+    }
+
+
+@app.get("/sales", response_model=list)
+def list_sales():
+    seed_sales_once()
+    if not sales_db:
+        raise HTTPException(status_code=500, detail="Sales catalogue misconfigured")
+
+    sales_with_full_image = []
+    for sale in sales_db:
+        sale_copy = sale.copy()
+        if sale_copy["image"].startswith("images/"):
+            sale_copy["image"] = f"/images/{sale_copy['image'].split('/')[-1]}"
+        sales_with_full_image.append(sale_copy)
+    return sales_with_full_image
+
+
+@app.get("/sales", response_model=list)
+def list_sales():
+    seed_sales_once()
+    if not sales_db:
+        raise HTTPException(status_code=500, detail="Sales catalogue misconfigured")
+
+    sales_with_full_image = []
+    for sale in sales_db:
+        sale_copy = sale.copy()
+        if sale_copy["image"].startswith("images/"):
+            sale_copy["image"] = f"/images/{sale_copy['image'].split('/')[-1]}"
+        sales_with_full_image.append(sale_copy)
+    return sales_with_full_image
