@@ -281,13 +281,6 @@ def seed_sales_once() -> None:
             }
         )
 
-
-@app.post("/auth/register", tags=["auth"])
-def register(request: RegisterRequest):
-    if request.email in users_db:
-        raise HTTPException(status_code=400, detail="User already exists")
-
-
 @app.post("/auth/register", tags=["auth"])
 def register(request: RegisterRequest):
     if request.email in users_db:
