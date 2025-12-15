@@ -146,10 +146,6 @@ def generate_fake_otp(length: int = 6):
     return "".join(random.choices(string.ascii_uppercase + string.digits, k=length))
 
 
-def generate_fake_otp(length: int = 6):
-    return "".join(random.choices(string.ascii_uppercase + string.digits, k=length))
-
-
 def get_user_by_email(email: str):
     user = users_db.get(email)
     if not user:
@@ -399,16 +395,9 @@ def refresh_token_endpoint(token: str):
         "token_type": "bearer",
     }
 
-
 @app.get("/me", response_model=UserResponse, tags=["profile"])
 def get_me(current_user: dict = Depends(get_current_user)):
     return current_user
-
-
-@app.get("/me", response_model=UserResponse, tags=["profile"])
-def get_me(current_user: dict = Depends(get_current_user)):
-    return current_user
-
 
 @app.post("/me", tags=["profile"])
 def create_me(user: Profile, current_user: dict = Depends(get_current_user)):
@@ -460,44 +449,6 @@ def list_projects(page: int = 1):
         "total_pages": total_pages,
         "total": total,
     }
-
-
-@app.get("/projects", response_model=dict, tags=["projects"])
-def list_projects(page: int = 1):
-    seed_projects_once()
-    per_page = 4
-    total = len(projects_db)
-    total_pages = 3
-    if total != 12:
-        raise HTTPException(status_code=500, detail="Projects catalogue misconfigured")
-    if page < 1 or page > total_pages:
-        raise HTTPException(status_code=400, detail="Page must be between 1 and 3")
-    start = (page - 1) * per_page
-    end = start + per_page
-    items = projects_db[start:end]
-    return {
-        "items": items,
-        "page": page,
-        "per_page": per_page,
-        "total_pages": total_pages,
-        "total": total,
-    }
-
-
-@app.get("/sales", response_model=list)
-def list_sales():
-    seed_sales_once()
-    if not sales_db:
-        raise HTTPException(status_code=500, detail="Sales catalogue misconfigured")
-
-    sales_with_full_image = []
-    for sale in sales_db:
-        sale_copy = sale.copy()
-        if sale_copy["image"].startswith("images/"):
-            sale_copy["image"] = f"/images/{sale_copy['image'].split('/')[-1]}"
-        sales_with_full_image.append(sale_copy)
-    return sales_with_full_image
-
 
 @app.get("/sales", response_model=list)
 def list_sales():
